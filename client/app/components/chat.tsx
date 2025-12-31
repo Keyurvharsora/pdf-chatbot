@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Send, FileText, Bot, Loader2 } from 'lucide-react';
+import { useUser } from '@clerk/nextjs';
 import * as React from 'react';
 
 interface Doc {
@@ -21,18 +22,86 @@ interface IMessage {
 }
 
 const ChatComponent: React.FC = () => {
+  const { user } = useUser();
   const [message, setMessage] = React.useState('');
   const [messages, setMessages] = React.useState<IMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [currentConversationId, setCurrentConversationId] = React.useState<number | null>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  React.useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
+
+  // Create a new conversation when component mounts
+  React.useEffect(() => {
+    if (user?.id && !currentConversationId) {
+      createNewConversation();
+    }
+  }, [user?.id]);
+
+  const createNewConversation = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const res = await fetch('http://localhost:8000/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          title: 'New Conversation'
+        })
+      });
+      const conversation = await res.json();
+      setCurrentConversationId(conversation.id);
+      setMessages([]);
+    } catch (err) {
+      console.error('Error creating conversation:', err);
+    }
+  };
 
   const handleChatMessage = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() || !user?.id) return;
+
+    // Create conversation if it doesn't exist
+    let conversationId = currentConversationId;
+    if (!conversationId) {
+      try {
+        const res = await fetch('http://localhost:8000/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            title: message.substring(0, 50) // Use first part of message as title
+          })
+        });
+        const conversation = await res.json();
+        conversationId = conversation.id;
+        setCurrentConversationId(conversationId);
+      } catch (err) {
+        console.error('Error creating conversation:', err);
+        return;
+      }
+    }
 
     setMessages((prev) => [...prev, { role: 'user', content: message }]);
+    const currentMessage = message;
     setMessage('');
     setLoading(true);
+    
     try {
-      const res = await fetch(`http://localhost:8000/chat?message=${message}`);
+      const res = await fetch(`http://localhost:8000/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: currentMessage,
+          conversationId: conversationId
+        })
+      });
       const data = await res.json();
       setMessages((prev) => [
         ...prev,
@@ -40,83 +109,103 @@ const ChatComponent: React.FC = () => {
       ]);
     } catch (err) {
       console.error('Chat error:', err);
+      setMessages((prev) => [
+          ...prev, 
+          { role: 'assistant', content: "Sorry, I encountered an error connecting to the server. Please try again." }
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-slate-400">Please sign in to start chatting</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative min-h-screen bg-gray-50 pb-28 px-4 pt-6">
-      <div className='text-black mb-2'>Type the message to start your conversations</div>
-      {loading && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="flex flex-col items-center">
-              <div className="loader mb-2" style={{ width: 48, height: 48, display: "flex", justifyContent: "center", alignItems: "center", border: '6px solid #3b82f6', borderTop: '6px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-              <span className="text-blue-600 font-semibold">Loading...</span>
-            </div>
-          </div>
-        )}
-      <div className="max-w-3xl mx-auto space-y-4 relative">
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`p-4 rounded-lg shadow-md whitespace-pre-wrap ${
-              msg.role === 'user'
-                ? 'bg-blue-100 text-black self-end text-right'
-                : 'bg-white text-gray-800'
-            }`}
-          >
-            <p className="mb-2 font-medium capitalize">{msg.role === "user" && "You"}</p>
-            <p>{msg.content}</p>
+    <div className="flex flex-col h-full bg-transparent w-full">
+       {/* Messages Area */}
+       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+          {messages.length === 0 && !loading && (
+             <div className="flex flex-col items-center justify-center h-full text-slate-500 opacity-50 select-none">
+                <Bot className="w-16 h-16 mb-4" />
+                <p className="text-lg font-medium">No messages yet</p>
+                <p className="text-sm">Start chatting with your documents!</p>
+             </div>
+          )}
+          
+          {messages.map((msg, index) => (
+             <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`
+                    max-w-[85%] md:max-w-[75%] rounded-2xl p-4 shadow-lg backdrop-blur-sm 
+                    ${msg.role === 'user' 
+                       ? 'bg-blue-600 text-white rounded-br-none' 
+                       : 'bg-white/10 text-slate-100 rounded-bl-none border border-white/5'
+                    }
+                `}>
+                   <div className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</div>
 
-            {msg.documents && msg.documents.length > 0 && (
-              <div className="mt-3 text-sm text-gray-600 border-t pt-2">
-                <p className="font-semibold mb-1">Referenced Docs:</p>
-                {msg.documents.map((doc, idx) => (
-                  <div key={idx} className="mb-2">
-                    <p className="text-gray-700">
-                      <strong>Source:</strong>{' '}
-                      {doc.metadata?.source?.split('\\').pop()}
-                    </p>
-                    <p>
-                      <strong>Page:</strong> {doc.metadata?.loc?.pageNumber}
-                    </p>
+                   {/* Docs */}
+                   {msg.documents && msg.documents.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sources</div>
+                         {msg.documents.map((doc, idx) => (
+                           <div key={idx} className="flex items-start gap-2 text-xs bg-black/20 p-2 rounded hover:bg-black/30 transition-colors">
+                              <FileText className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
+                              <div className="overflow-hidden">
+                                 <p className="font-medium text-slate-300 truncate" title={doc.metadata?.source}>
+                                     {doc.metadata?.source?.split(/[/\\]/).pop() || 'Unknown Source'}
+                                 </p>
+                                 <p className="text-slate-500">Page {doc.metadata?.loc?.pageNumber}</p>
+                              </div>
+                           </div>
+                         ))}
+                      </div>
+                   )}
+                </div>
+             </div>
+          ))}
+
+          {loading && (
+             <div className="flex justify-start">
+               <div className="bg-white/5 text-slate-300 rounded-2xl rounded-bl-none p-4 flex items-center gap-3 border border-white/5">
+                  <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+                  <span className="text-xs font-medium">AI is thinking...</span>
+               </div>
+             </div>
+          )}
+          <div ref={messagesEndRef} />
+       </div>
 
-      {/* Fixed input bar */}
-      <div className="fixed bottom-4 left-0 w-full flex justify-center px-4">
-        <div className= "px-4 py-2 flex gap-3 items-center max-w-2xl w-full">
-          <Input
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-grow h-12 bg-gray-100 text-black rounded-full px-4 focus:outline-none"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleChatMessage();
-            }}
-          />
-          <Button
-            onClick={handleChatMessage}
-            disabled={!message.trim()}
-            className="h-12 w-25 px-5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50"
-          >
-            Send
-          </Button>
-        </div>
-      </div>
-      {/* Loader spinner animation */}
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
+       {/* Input Area */}
+       <div className="p-4 md:p-6 pt-0">
+          <div className="relative flex items-center gap-2 bg-white/5 border border-white/10 rounded-full p-2 pl-6 shadow-2xl backdrop-blur-md focus-within:ring-2 focus-within:ring-blue-500/50 transition-all">
+             <input
+               value={message}
+               onChange={(e) => setMessage(e.target.value)}
+               onKeyDown={(e) => e.key === 'Enter' && handleChatMessage()}
+               placeholder="Ask questions about your PDF..."
+               className="flex-1 bg-transparent text-white placeholder-slate-400 focus:outline-none py-2"
+               disabled={loading}
+             />
+             <Button
+                onClick={handleChatMessage}
+                disabled={!message.trim() || loading}
+                size="icon"
+                className="rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg w-10 h-10 flex items-center justify-center shrink-0 disabled:bg-slate-700 disabled:text-slate-500"
+             >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+             </Button>
+          </div>
+       </div>
     </div>
   );
 };

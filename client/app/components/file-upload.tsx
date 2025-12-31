@@ -1,41 +1,102 @@
-'use client'
-import { Upload } from 'lucide-react'
-import * as React from 'react'
+'use client';
+import { Upload, CheckCircle, Loader2 } from 'lucide-react';
+import * as React from 'react';
 
 const FileUploadComponent: React.FC = () => {
+    const [isHovering, setIsHovering] = React.useState(false);
+    const [isUploading, setIsUploading] = React.useState(false);
+    const [uploadStatus, setUploadStatus] = React.useState<'idle' | 'success' | 'error'>('idle');
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-    const handleFileUpload = () => {
-        const el = document.createElement('input');
-        el.setAttribute('type', 'file');
-        el.setAttribute('accept', 'application/pdf');
-        el.addEventListener('change', async (e) => {
-            if(!!el.files?.length){
-                const file = el?.files?.item(0);
-                if(file){
-                    const formData = new FormData();
-                    formData.append('pdf', file);   
-                    const response = await fetch('http://localhost:8000/upload/pdf', {
-                        method: "POST",
-                        body: formData
-                    })
-                    if(response) console.log("file uploaded",response)
-                }
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            await uploadFile(file);
+        }
+    };
+
+    const uploadFile = async (file: File) => {
+        setIsUploading(true);
+        setUploadStatus('idle');
+        
+        const formData = new FormData();
+        formData.append('pdf', file);
+        
+        try {
+            const response = await fetch('http://localhost:8000/upload/pdf', {
+                method: "POST",
+                body: formData
+            });
+            if (response.ok) {
+                setUploadStatus('success');
+                // clear success after 3 seconds
+                setTimeout(() => setUploadStatus('idle'), 3000);
+            } else {
+                setUploadStatus('error');
             }
-        })
-        el.click()
-    }
+        } catch (err) {
+            setUploadStatus('error');
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     return (
-        <div className="bg-gradient-to-br from-amber-400 to-amber-500 flex justify-center items-center p-8 rounded-2xl shadow-2xl hover:shadow-amber-300 transition-shadow duration-300 w-full max-w-md mx-auto">
-            <div className="flex flex-col items-center w-full">
-                <h2 className="text-2xl font-bold mb-2 text-gray-900 drop-shadow">📄 Upload PDF</h2>
-                <div className="bg-white rounded-full p-4 shadow-md mb-4 flex items-center justify-center">
-                    <Upload className="w-10 h-10 text-amber-500" />
+        <div className="w-full">
+            <input 
+                type="file" 
+                ref={fileInputRef}
+                accept="application/pdf" 
+                className="hidden"
+                onChange={handleFileChange}
+            />
+            
+            <div 
+                className={`
+                    relative group cursor-pointer 
+                    border-2 border-dashed rounded-2xl p-8 
+                    transition-all duration-300 ease-in-out
+                    flex flex-col items-center justify-center gap-4
+                    ${isHovering 
+                        ? 'border-blue-500 bg-blue-500/10' 
+                        : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                    }
+                `}
+                onDragOver={(e) => { e.preventDefault(); setIsHovering(true); }}
+                onDragLeave={() => setIsHovering(false)}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    setIsHovering(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        uploadFile(e.dataTransfer.files[0]);
+                    }
+                }}
+                onClick={() => fileInputRef.current?.click()}
+            >
+                <div className={`
+                    p-4 rounded-full transition-all duration-300
+                    ${isUploading ? 'bg-blue-500/20 animate-pulse' : 'bg-white/10 group-hover:bg-blue-500/20 group-hover:scale-110'}
+                `}>
+                    {isUploading ? (
+                        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                    ) : uploadStatus === 'success' ? (
+                        <CheckCircle className="w-8 h-8 text-green-400" />
+                    ) : (
+                        <Upload className="w-8 h-8 text-slate-300 group-hover:text-blue-400" />
+                    )}
                 </div>
-                    <div className="inline-block w-full text-center bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-6 rounded-lg cursor-pointer shadow transition-colors duration-200" onClick={handleFileUpload }>Choose PDF</div>
+
+                <div className="text-center space-y-1">
+                    <p className="text-sm font-medium text-slate-200">
+                        {isUploading ? 'Uploading pdf...' : uploadStatus === 'success' ? 'Upload Complete!' : 'Click to upload or drag & drop'}
+                    </p>
+                    {!isUploading && uploadStatus !== 'success' && (
+                        <p className="text-xs text-slate-400">PDF only</p>
+                    )}
+                </div>
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default FileUploadComponent
+export default FileUploadComponent;
