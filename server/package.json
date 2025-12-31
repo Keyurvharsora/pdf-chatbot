@@ -20,6 +20,7 @@
     "@langchain/qdrant": "^0.1.2",
     "@langchain/textsplitters": "^0.1.0",
     "@mistralai/mistralai": "^1.7.5",
+    "better-sqlite3": "^12.5.0",
     "bullmq": "^5.56.5",
     "cors": "^2.8.5",
     "express": "4.x",
