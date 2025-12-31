@@ -4,6 +4,8 @@ import { useUser } from '@clerk/nextjs';
 import { MessageSquare, Trash2, Clock } from 'lucide-react';
 import * as React from 'react';
 
+import Loader from './loader';
+
 interface Conversation {
   id: number;
   user_id: string;
@@ -22,17 +24,17 @@ interface Message {
 }
 
 const HistoryComponent: React.FC = () => {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [conversations, setConversations] = React.useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = React.useState<number | null>(null);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
-    if (user?.id) {
+    if (isLoaded && user?.id) {
       fetchConversations();
     }
-  }, [user?.id]);
+  }, [user?.id, isLoaded]);
 
   const fetchConversations = async () => {
     if (!user?.id) return;
@@ -90,6 +92,14 @@ const HistoryComponent: React.FC = () => {
     return date.toLocaleDateString();
   };
 
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader />
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -101,7 +111,7 @@ const HistoryComponent: React.FC = () => {
   return (
     <div className="flex h-full w-full">
       {/* Conversations List */}
-      <div className="w-80 border-r border-white/10 bg-black/10 flex flex-col">
+      <div className="w-80 pb-10 border-r border-white/10 bg-black/10 flex flex-col">
         <div className="p-4 border-b border-white/10">
           <h2 className="text-lg font-semibold text-slate-200">Chat History</h2>
           <p className="text-xs text-slate-400 mt-1">{conversations.length} conversations</p>
@@ -168,7 +178,15 @@ const HistoryComponent: React.FC = () => {
           </div>
         ) : loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-slate-400">Loading messages...</div>
+            <Loader />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-slate-500">
+            <div className="p-4 rounded-full bg-white/5 mb-4">
+              <MessageSquare className="w-8 h-8 opacity-20" />
+            </div>
+            <p className="text-sm font-medium">Empty Conversation</p>
+            <p className="text-xs opacity-60">This chat doesn't contain any messages yet.</p>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-4">

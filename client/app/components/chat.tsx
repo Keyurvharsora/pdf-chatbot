@@ -5,6 +5,8 @@ import { Send, FileText, Bot, Loader2 } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
 import * as React from 'react';
 
+import Loader from './loader';
+
 interface Doc {
   pageContent?: string;
   metadata?: {
@@ -22,7 +24,7 @@ interface IMessage {
 }
 
 const ChatComponent: React.FC = () => {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [message, setMessage] = React.useState('');
   const [messages, setMessages] = React.useState<IMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -39,10 +41,10 @@ const ChatComponent: React.FC = () => {
 
   // Create a new conversation when component mounts
   React.useEffect(() => {
-    if (user?.id && !currentConversationId) {
+    if (isLoaded && user?.id && !currentConversationId) {
       createNewConversation();
     }
-  }, [user?.id]);
+  }, [user?.id, isLoaded]);
 
   const createNewConversation = async () => {
     if (!user?.id) return;
@@ -118,6 +120,14 @@ const ChatComponent: React.FC = () => {
     }
   };
 
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader />
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -129,7 +139,7 @@ const ChatComponent: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-transparent w-full">
        {/* Messages Area */}
-       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
           {messages.length === 0 && !loading && (
              <div className="flex flex-col items-center justify-center h-full text-slate-500 opacity-50 select-none">
                 <Bot className="w-16 h-16 mb-4" />

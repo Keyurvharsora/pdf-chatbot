@@ -223,3 +223,42 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* --- Custom Scrollbar Styling --- */
+@layer utilities {
+  /* Modern, readable scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  /* Force scrollbar to appear only when needed */
+  .overflow-y-auto {
+    overflow-y: auto !important;
+  }
+
+  /* Hide scrollbar utility remains available */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.overflow-x-hidden {
+  overflow-x: hidden !important;
+}
