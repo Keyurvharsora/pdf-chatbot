@@ -5,8 +5,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "node --watch index.js",
-    "dev:worker": "node --watch worker.js"
+    "dev": "node --watch --env-file=.env index.js",
+    "dev:worker": "node --watch --env-file=.env worker.js"
   },
   "keywords": [],
   "author": "",

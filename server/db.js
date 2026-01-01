@@ -38,7 +38,7 @@ export const queries = {
     "INSERT INTO conversations (user_id, title) VALUES (?, ?) RETURNING *"
   ),
   getConversationsByUser: db.prepare(
-    "SELECT * FROM conversations WHERE user_id = ? ORDER BY updated_at DESC"
+    "SELECT c.* FROM conversations c WHERE c.user_id = ? AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id) ORDER BY c.updated_at DESC"
   ),
   getConversation: db.prepare("SELECT * FROM conversations WHERE id = ?"),
   updateConversationTitle: db.prepare(

@@ -1,54 +1,63 @@
 import { Worker } from "bullmq";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { CharacterTextSplitter } from "@langchain/textsplitters";
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { MistralAIEmbeddings } from "@langchain/mistralai";
 import { QdrantVectorStore } from "@langchain/qdrant";
 
 export const worker = new Worker(
-  'file-upload-queue',
-  async job => {
-    console.log(job.data);
-    const data = JSON.parse(job.data)
+  "file-upload-queue",
+  async (job) => {
+    console.log("Processing job:", job.id);
+    const data = JSON.parse(job.data);
 
     const loader = new PDFLoader(data.path);
     const docs = await loader.load();
-    console.log('docs',docs)
-    const embeddings = new MistralAIEmbeddings({
-        model: "mistral-embed",
-        apiKey: 'x5wz7bgueh2KWCmJm3Gr96VIxUUIwVba'
+
+    // 1. Split text into chunks to avoid Mistral's token limit
+    const textSplitter = new RecursiveCharacterTextSplitter({
+      chunkSize: 1000,
+      chunkOverlap: 200,
     });
-    console.log("embeddings",embeddings)
-    let vectorStore;
-try {
-  vectorStore = await QdrantVectorStore.fromExistingCollection(embeddings, {
-    url: 'http://localhost:6333',
-    collectionName: "langchainjs-testing",
-  });
-  console.log("Vector store created:", !!vectorStore);
-} catch (err) {
-  console.error("Error creating vector store:", err);
-  return;
-}
+    const splitDocs = await textSplitter.splitDocuments(docs);
+    console.log(`Split into ${splitDocs.length} chunks`);
+
+    const embeddings = new MistralAIEmbeddings({
+      model: "mistral-embed",
+      apiKey: process.env.MISTRAL_API_KEY,
+    });
 
     try {
-  console.log("Adding documents to vector store...");
-await vectorStore.addDocuments(docs);
-console.log("All data are added to vector store...");
-} catch (err) {
-  console.error("Error adding documents to vector store:", err);
-}
+      const collectionName = process.env.QDRANT_COLLECTION_NAME;
+      const qdrantUrl = process.env.QDRANT_URL;
 
-//     const textSplitter = new CharacterTextSplitter({
-//   chunkSize: 500,
-//   chunkOverlap: 0,
-// });
-// const texts = await textSplitter.splitText(docs);
+      // 2. Clear old data from collection
+      console.log(`Resetting collection: ${collectionName}`);
+      try {
+        await fetch(`${qdrantUrl}/collections/${collectionName}`, {
+          method: "DELETE",
+        });
+      } catch (err) {
+        console.warn("Collection reset skipped (might be new).");
+      }
 
+      // 3. Add chunks to vector store
+      console.log("Vectorizing and adding to Qdrant...");
+      await QdrantVectorStore.fromDocuments(splitDocs, embeddings, {
+        url: qdrantUrl,
+        collectionName: collectionName,
+      });
+
+      console.log("Success: PDF is now searchable.");
+      return { success: true };
+    } catch (err) {
+      console.error("Worker processing error:", err);
+      throw err; // Ensure job fails in BullMQ if processing fails
+    }
   },
-  { connection: {
-    host: "localhost",
-    port: "6379"
-  } },
+  {
+    connection: {
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT,
+    },
+  }
 );
-

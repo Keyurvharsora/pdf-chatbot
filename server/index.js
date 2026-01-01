@@ -7,12 +7,12 @@ import { QdrantVectorStore } from "@langchain/qdrant";
 import { Mistral } from "@mistralai/mistralai";
 import { queries } from "./db.js";
 
-const client = new Mistral({ apiKey: "x5wz7bgueh2KWCmJm3Gr96VIxUUIwVba" });
+const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
 
 const myQueue = new Queue("file-upload-queue", {
   connection: {
-    host: "localhost",
-    port: "6379",
+    host: process.env.REDIS_HOST,
+    port: process.env.REDIS_PORT,
   },
 });
 
@@ -42,7 +42,7 @@ app.get("/", (req, res) => {
 });
 
 app.post("/upload/pdf", upload.single("pdf"), async (req, res) => {
-  await myQueue.add(
+  const job = await myQueue.add(
     "file-ready",
     JSON.stringify({
       filename: req.file.originalname,
@@ -50,7 +50,19 @@ app.post("/upload/pdf", upload.single("pdf"), async (req, res) => {
       path: req.file.path,
     })
   );
-  return res.json({ msg: "PDF uploaded" });
+  return res.json({ msg: "PDF uploaded", jobId: job.id });
+});
+
+app.get("/upload-status/:jobId", async (req, res) => {
+  const { jobId } = req.params;
+  const job = await myQueue.getJob(jobId);
+
+  if (!job) {
+    return res.status(404).json({ error: "Job not found" });
+  }
+
+  const state = await job.getState();
+  return res.json({ state });
 });
 
 // Create new conversation
@@ -122,21 +134,23 @@ app.post("/chat", async (req, res) => {
 
     const embeddings = new MistralAIEmbeddings({
       model: "mistral-embed",
-      apiKey: "x5wz7bgueh2KWCmJm3Gr96VIxUUIwVba",
+      apiKey: process.env.MISTRAL_API_KEY,
     });
 
     const vectorStore = await QdrantVectorStore.fromExistingCollection(
       embeddings,
       {
-        url: "http://localhost:6333",
-        collectionName: "langchainjs-testing",
+        url: process.env.QDRANT_URL,
+        collectionName: process.env.QDRANT_COLLECTION_NAME,
       }
     );
 
     const retriever = vectorStore.asRetriever({ k: 2 });
     const result = await retriever.invoke(userQuery);
 
-    const SYSTEM_PROMPT = `You are helpfull AI assistant query based on the available context from PDF file.
+    const SYSTEM_PROMPT = `Answer strictly using the provided context only.
+    Do not infer, assume, or add external information.
+
     Context: ${JSON.stringify(result)}
     `;
 
@@ -147,6 +161,7 @@ app.post("/chat", async (req, res) => {
         { role: "user", content: userQuery },
       ],
     });
+    console.log("🚀 ~ chatResponse:", chatResponse);
 
     const assistantMessage = chatResponse.choices[0].message.content;
 
