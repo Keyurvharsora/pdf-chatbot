@@ -10,6 +10,7 @@ interface Conversation {
   id: number;
   user_id: string;
   title: string;
+  type: 'chat' | 'summary';
   created_at: string;
   updated_at: string;
 }
@@ -121,53 +122,80 @@ const HistoryComponent: React.FC = () => {
   return (
     <div className="flex h-full w-full">
       {/* Conversations List */}
-      <div className="w-80 pb-10 border-r border-white/10 bg-black/10 flex flex-col">
-        <div className="p-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-slate-200">Chat History</h2>
-          <p className="text-xs text-slate-400 mt-1">{conversations.length} conversations</p>
+      <div className="w-[340px] border-r border-white/10 bg-black/20 flex flex-col h-full">
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-400" />
+                Conversations History
+            </h2>
+          </div>
+          <div className="flex gap-2">
+            <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {conversations.length} Items
+            </div>
+          </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-500 p-4">
-              <MessageSquare className="w-12 h-12 mb-2 opacity-50" />
-              <p className="text-sm text-center">No conversations yet</p>
+            <div className="flex flex-col items-center justify-center h-full text-slate-600 p-8 space-y-4">
+              <div className="p-4 rounded-full bg-white/5">
+                <MessageSquare className="w-8 h-8 opacity-20" />
+              </div>
+              <p className="text-sm font-medium text-center">No history documented yet</p>
             </div>
           ) : (
-            <div className="p-2 space-y-1">
+            <div className="p-3 space-y-2">
               {conversations.map((conv) => (
                 <div
                   key={conv.id}
                   className={`
-                    group relative p-3 rounded-lg cursor-pointer transition-all
+                    group relative p-4 rounded-2xl cursor-pointer transition-all duration-300
                     ${selectedConversation === conv.id 
-                      ? 'bg-blue-600/20 border border-blue-500/30' 
+                      ? 'bg-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/5' 
                       : 'hover:bg-white/5 border border-transparent'
                     }
                   `}
                   onClick={() => fetchMessages(conv.id)}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-200 truncate">
-                        {conv.title}
-                      </p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3 text-slate-500" />
-                        <p className="text-xs text-slate-500">
-                          {formatDate(conv.updated_at)}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold truncate ${selectedConversation === conv.id ? 'text-blue-400' : 'text-slate-200'}`}>
+                          {conv.title}
                         </p>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversation(conv.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 rounded-xl transition-all"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500/70" />
+                      </button>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteConversation(conv.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-400" />
-                    </button>
+
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`
+                            px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter
+                            ${conv.type === 'summary' 
+                                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
+                                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            }
+                        `}>
+                            {conv.type}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3 h-3 text-slate-600" />
+                          <p className="text-[10px] font-medium text-slate-500">
+                            {formatDate(conv.updated_at)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -217,11 +245,6 @@ const HistoryComponent: React.FC = () => {
                   <div className="text-sm leading-relaxed whitespace-pre-wrap">
                     {msg.content}
                   </div>
-                  {msg.documents && (
-                    <div className="mt-3 pt-3 border-t border-white/10 text-xs text-slate-400">
-                      <p>📄 Sources attached</p>
-                    </div>
-                  )}
                 </div>
               </div>
             ))}

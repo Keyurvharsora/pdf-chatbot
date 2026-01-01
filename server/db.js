@@ -31,11 +31,20 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
 `);
 
+// Migration: Add type column if it doesn't exist
+try {
+  db.exec(
+    "ALTER TABLE conversations ADD COLUMN type TEXT NOT NULL CHECK(type IN ('chat', 'summary')) DEFAULT 'chat'"
+  );
+} catch (e) {
+  // Column already exists or other error
+}
+
 // Prepared statements for better performance
 export const queries = {
   // Conversations
   createConversation: db.prepare(
-    "INSERT INTO conversations (user_id, title) VALUES (?, ?) RETURNING *"
+    "INSERT INTO conversations (user_id, title, type) VALUES (?, ?, ?) RETURNING *"
   ),
   getConversationsByUser: db.prepare(
     "SELECT c.* FROM conversations c WHERE c.user_id = ? AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id) ORDER BY c.updated_at DESC"

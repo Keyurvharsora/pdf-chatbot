@@ -68,10 +68,11 @@ app.get("/upload-status/:jobId", async (req, res) => {
 // Create new conversation
 app.post("/conversations", async (req, res) => {
   try {
-    const { userId, title } = req.body;
+    const { userId, title, type } = req.body;
     const conversation = queries.createConversation.get(
       userId,
-      title || "New Conversation"
+      title || "New Conversation",
+      type || "chat"
     );
     return res.json(conversation);
   } catch (error) {
@@ -122,6 +123,78 @@ app.delete("/conversations/:conversationId", async (req, res) => {
     return res.status(500).json({ error: "Failed to delete conversation" });
   }
 });
+// Summarize endpoint
+app.post("/summarize", async (req, res) => {
+  try {
+    const { userId, filename } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const embeddings = new MistralAIEmbeddings({
+      model: "mistral-embed",
+      apiKey: process.env.MISTRAL_API_KEY,
+    });
+
+    const vectorStore = await QdrantVectorStore.fromExistingCollection(
+      embeddings,
+      {
+        url: process.env.QDRANT_URL,
+        collectionName: process.env.QDRANT_COLLECTION_NAME,
+      }
+    );
+
+    // Retrieve a larger set of chunks for summary
+    const retriever = vectorStore.asRetriever({ k: 10 });
+    const docs = await retriever.invoke(
+      "Provide a comprehensive summary of this document."
+    );
+
+    const context = docs.map((d) => d.pageContent).join("\n\n");
+
+    const SYSTEM_PROMPT = `You are a professional document summarizer. 
+    Create a concise yet comprehensive summary of the provided text.
+    Use bullet points for key takeaways and start with a brief 2-3 sentence overview.
+    
+    Document Name: ${filename || "Uploaded PDF"}
+    `;
+
+    const chatResponse = await client.chat.complete({
+      model: "mistral-large-latest",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `Context: ${context}` },
+      ],
+    });
+
+    const summary = chatResponse.choices[0].message.content;
+
+    // Create a new summary type conversation
+    const conversation = queries.createConversation.get(
+      userId,
+      `Summary: ${filename || "Document"}`,
+      "summary"
+    );
+
+    // Save the summary as an assistant message
+    queries.createMessage.run(
+      conversation.id,
+      "assistant",
+      summary,
+      JSON.stringify(docs)
+    );
+
+    return res.json({
+      summary,
+      conversationId: conversation.id,
+      docs,
+    });
+  } catch (error) {
+    console.error("Summary error:", error);
+    return res.status(500).json({ error: "Failed to generate summary" });
+  }
+});
 
 // Chat endpoint with conversation support
 app.post("/chat", async (req, res) => {
@@ -150,7 +223,6 @@ app.post("/chat", async (req, res) => {
 
     const SYSTEM_PROMPT = `Answer strictly using the provided context only.
     Do not infer, assume, or add external information.
-
     Context: ${JSON.stringify(result)}
     `;
 
