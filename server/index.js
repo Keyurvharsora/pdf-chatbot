@@ -167,6 +167,19 @@ app.post("/chat", async (req, res) => {
 
     // Save messages to database if conversationId is provided
     if (conversationId) {
+      // If this is a "New Conversation", update the title using the first user question
+      const currentConversation = queries.getConversation.get(conversationId);
+      if (
+        currentConversation &&
+        currentConversation.title === "New Conversation"
+      ) {
+        const newTitle =
+          userQuery.length > 50
+            ? userQuery.substring(0, 50) + "..."
+            : userQuery;
+        queries.updateConversationTitle.run(newTitle, conversationId);
+      }
+
       // Save user message
       queries.createMessage.run(conversationId, "user", userQuery, null);
 
