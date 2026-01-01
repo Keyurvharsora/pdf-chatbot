@@ -1,6 +1,8 @@
 'use client';
 import { Upload, CheckCircle, Loader2 } from 'lucide-react';
 import * as React from 'react';
+import { API_BASE_URL } from '@/lib/api';
+
 
 const FileUploadComponent: React.FC = () => {
     const [isHovering, setIsHovering] = React.useState(false);
@@ -25,7 +27,8 @@ const FileUploadComponent: React.FC = () => {
         formData.append('pdf', file);
         
         try {
-            const response = await fetch('http://localhost:8000/upload/pdf', {
+            const response = await fetch(`${API_BASE_URL}/upload/pdf`, {
+
                 method: "POST",
                 body: formData
             });
@@ -38,7 +41,8 @@ const FileUploadComponent: React.FC = () => {
                 
                 const pollStatus = async () => {
                     try {
-                        const statusRes = await fetch(`http://localhost:8000/upload-status/${jobId}`);
+                        const statusRes = await fetch(`${API_BASE_URL}/upload-status/${jobId}`);
+
                         const { state } = await statusRes.json();
                         
                         if (state === 'completed') {

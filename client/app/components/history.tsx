@@ -5,6 +5,8 @@ import { MessageSquare, Trash2, Clock } from 'lucide-react';
 import * as React from 'react';
 
 import Loader from './loader';
+import { API_BASE_URL } from '@/lib/api';
+
 
 interface Conversation {
   id: number;
@@ -41,7 +43,8 @@ const HistoryComponent: React.FC = () => {
     if (!user?.id) return;
     
     try {
-      const res = await fetch(`http://localhost:8000/conversations/${user.id}`);
+      const res = await fetch(`${API_BASE_URL}/conversations/${user.id}`);
+
       const data = await res.json();
       setConversations(data);
     } catch (err) {
@@ -52,7 +55,8 @@ const HistoryComponent: React.FC = () => {
   const fetchMessages = async (conversationId: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/conversations/${conversationId}/messages`);
+      const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`);
+
       const data = await res.json();
       setMessages(data);
       setSelectedConversation(conversationId);
@@ -65,7 +69,8 @@ const HistoryComponent: React.FC = () => {
 
   const deleteConversation = async (conversationId: number) => {
     try {
-      await fetch(`http://localhost:8000/conversations/${conversationId}`, {
+      await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+
         method: 'DELETE'
       });
       setConversations(conversations.filter(c => c.id !== conversationId));

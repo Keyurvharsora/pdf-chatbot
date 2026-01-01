@@ -4,6 +4,8 @@ import { FileText, Sparkles, Loader2, Download, Copy, Check, Zap, Brain, Refresh
 import { useUser } from '@clerk/nextjs';
 import * as React from 'react';
 import Loader from './loader';
+import { API_BASE_URL } from '@/lib/api';
+
 
 const SummaryComponent: React.FC = () => {
   const { user, isLoaded } = useUser();
@@ -15,7 +17,8 @@ const SummaryComponent: React.FC = () => {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/summarize', {
+      const res = await fetch(`${API_BASE_URL}/summarize`, {
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
