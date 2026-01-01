@@ -6,6 +6,7 @@ const FileUploadComponent: React.FC = () => {
     const [isHovering, setIsHovering] = React.useState(false);
     const [isUploading, setIsUploading] = React.useState(false);
     const [uploadStatus, setUploadStatus] = React.useState<'idle' | 'success' | 'error'>('idle');
+    const [statusText, setStatusText] = React.useState('Click to upload or drag & drop');
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,6 +19,7 @@ const FileUploadComponent: React.FC = () => {
     const uploadFile = async (file: File) => {
         setIsUploading(true);
         setUploadStatus('idle');
+        setStatusText('Uploading PDF...');
         
         const formData = new FormData();
         formData.append('pdf', file);
@@ -27,16 +29,50 @@ const FileUploadComponent: React.FC = () => {
                 method: "POST",
                 body: formData
             });
+
             if (response.ok) {
-                setUploadStatus('success');
-                // clear success after 3 seconds
-                setTimeout(() => setUploadStatus('idle'), 3000);
+                const { jobId } = await response.json();
+                
+                // Start polling for processing status
+                setStatusText('AI is analyzing and indexing...');
+                
+                const pollStatus = async () => {
+                    try {
+                        const statusRes = await fetch(`http://localhost:8000/upload-status/${jobId}`);
+                        const { state } = await statusRes.json();
+                        
+                        if (state === 'completed') {
+                            setUploadStatus('success');
+                            setStatusText('Ready to chat!');
+                            setIsUploading(false);
+                            setTimeout(() => {
+                                setUploadStatus('idle');
+                                setStatusText('Click to upload or drag & drop');
+                            }, 3000);
+                        } else if (state === 'failed') {
+                            setUploadStatus('error');
+                            setStatusText('Processing failed');
+                            setIsUploading(false);
+                        } else {
+                            // Continue polling every 1 second
+                            setTimeout(pollStatus, 1000);
+                        }
+                    } catch (err) {
+                        setUploadStatus('error');
+                        setStatusText('Status check failed');
+                        setIsUploading(false);
+                    }
+                };
+                
+                pollStatus();
             } else {
                 setUploadStatus('error');
+                setStatusText('Upload failed');
+                setIsUploading(false);
             }
         } catch (err) {
             setUploadStatus('error');
-        } finally {
+            setStatusText('Connection error');
             setIsUploading(false);
         }
     };
@@ -88,7 +124,7 @@ const FileUploadComponent: React.FC = () => {
 
                 <div className="text-center space-y-1">
                     <p className="text-sm font-medium text-slate-200">
-                        {isUploading ? 'Uploading pdf...' : uploadStatus === 'success' ? 'Upload Complete!' : 'Click to upload or drag & drop'}
+                        {statusText}
                     </p>
                     {!isUploading && uploadStatus !== 'success' && (
                         <p className="text-xs text-slate-400">PDF only</p>
