@@ -41,33 +41,6 @@ const ChatComponent: React.FC = () => {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Create a new conversation when component mounts
-  React.useEffect(() => {
-    if (isLoaded && user?.id && !currentConversationId) {
-      createNewConversation();
-    }
-  }, [user?.id, isLoaded]);
-
-  const createNewConversation = async () => {
-    if (!user?.id) return;
-    
-    try {
-      const res = await fetch(`${API_BASE_URL}/conversations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          title: 'New Conversation'
-        })
-      });
-      const conversation = await res.json();
-      setCurrentConversationId(conversation.id);
-      setMessages([]);
-    } catch (err) {
-      console.error('Error creating conversation:', err);
-    }
-  };
-
   const handleChatMessage = async () => {
     if (!message.trim() || !user?.id) return;
 
@@ -75,7 +48,7 @@ const ChatComponent: React.FC = () => {
     let conversationId = currentConversationId;
     if (!conversationId) {
       try {
-        const res = await fetch('http://localhost:8000/conversations', {
+        const res = await fetch(`${API_BASE_URL}/conversations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
