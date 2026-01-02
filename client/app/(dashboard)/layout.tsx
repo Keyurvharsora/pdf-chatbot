@@ -15,7 +15,7 @@ export default function DashboardLayout({
 
   const navItems = [
     { name: 'Chat', icon: MessageSquare, path: '/chat' },
-    { name: 'Summary', icon: Sparkles, path: '/summary' },
+    { name: 'Summarize', icon: Sparkles, path: '/summary' },
     { name: 'History', icon: History, path: '/history' },
   ];
 

@@ -33,9 +33,10 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className="h-screen w-full overflow-hidden">
+      <html lang="en" className={`h-screen w-full overflow-hidden`}>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen w-full flex flex-col bg-[#0d0d0d]`}
+          suppressHydrationWarning
         >
           <header className="flex-shrink-0 flex justify-between items-center px-6 h-16 border-b border-white/10 bg-black shadow-lg z-50">
             {/* Left side: App Logo */}
