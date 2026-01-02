@@ -248,9 +248,20 @@ app.post("/chat", async (req, res) => {
     const retriever = vectorStore.asRetriever({ k: 2 });
     const result = await retriever.invoke(userQuery);
 
-    const SYSTEM_PROMPT = `Answer strictly using the provided context only.
-    Do not infer, assume, or add external information.
-    Context: ${JSON.stringify(result)}
+    const contextText = result.map((doc) => doc.pageContent).join("\n\n");
+
+    const SYSTEM_PROMPT = `
+    You are a professional Document Assistant. Your goal is to provide accurate information based ONLY on the provided document context.
+
+    RULES:
+    1. STRICT CONTEXT ADHERENCE: Use ONLY the provided context to answer the user's question. 
+    2. UNCERTAINTY: If the answer is not contained within the context, politely state that the information is not available in the uploaded document. Do not make up an answer.
+    3. FORMATTING: Use clear, concise language. Use bullet points if the answer contains multiple steps or items.
+    4. TONE: Maintain a helpful, neutral, and professional tone.
+    5. NO HALLUCINATION: Do not add external knowledge or information from the internet.
+
+    CONTEXT:
+    ${contextText}
     `;
 
     const chatResponse = await client.chat.complete({
