@@ -1,4 +1,5 @@
 import express from "express";
+import { createClient } from "redis";
 import cors from "cors";
 import multer from "multer";
 import { Queue } from "bullmq";
@@ -9,12 +10,19 @@ import { queries } from "./db.js";
 
 const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
 
-const myQueue = new Queue("file-upload-queue", {
-  connection: {
-    host: process.env.REDIS_HOST,
-    port: process.env.REDIS_PORT,
-  },
+// Redis client initialization as requested
+const redisClient = createClient({
+  url: process.env.REDIS_URL,
 });
+redisClient.on("error", (err) => console.error("Redis Error", err));
+await redisClient.connect();
+
+const connection = process.env.REDIS_URL || {
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT,
+};
+
+const myQueue = new Queue("file-upload-queue", { connection });
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
