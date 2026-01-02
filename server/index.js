@@ -30,10 +30,34 @@ const upload = multer({ storage: storage });
 
 const app = express();
 app.use(express.json());
+
+const allowedOrigins = [
+  "http://192.168.0.114:3000",
+  "http://192.168.0.114:3001",
+  "https://pdf-chatbot-zeta.vercel.app",
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: "*",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      console.log("Incoming Origin:", origin);
+
+      const isVercel = origin.endsWith(".vercel.app");
+      const isAllowed = allowedOrigins.includes(origin) || isVercel;
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.log("CORS Rejected for:", origin);
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -69,7 +93,7 @@ app.get("/upload-status/:jobId", async (req, res) => {
 app.post("/conversations", async (req, res) => {
   try {
     const { userId, title, type } = req.body;
-    const conversation = queries.createConversation.get(
+    const conversation = await queries.createConversation(
       userId,
       title || "New Conversation",
       type || "chat"
@@ -85,7 +109,7 @@ app.post("/conversations", async (req, res) => {
 app.get("/conversations/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    const conversations = queries.getConversationsByUser.all(userId);
+    const conversations = await queries.getConversationsByUser(userId);
     return res.json(conversations);
   } catch (error) {
     console.error("Error fetching conversations:", error);
@@ -97,12 +121,12 @@ app.get("/conversations/:userId", async (req, res) => {
 app.get("/conversations/:conversationId/messages", async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const messages = queries.getMessagesByConversation.all(conversationId);
+    const messages = await queries.getMessagesByConversation(conversationId);
 
     // Parse documents JSON for each message
     const parsedMessages = messages.map((msg) => ({
       ...msg,
-      documents: msg.documents ? JSON.parse(msg.documents) : null,
+      documents: msg.documents || null,
     }));
 
     return res.json(parsedMessages);
@@ -116,7 +140,7 @@ app.get("/conversations/:conversationId/messages", async (req, res) => {
 app.delete("/conversations/:conversationId", async (req, res) => {
   try {
     const { conversationId } = req.params;
-    queries.deleteConversation.run(conversationId);
+    await queries.deleteConversation(conversationId);
     return res.json({ success: true });
   } catch (error) {
     console.error("Error deleting conversation:", error);
@@ -171,19 +195,14 @@ app.post("/summarize", async (req, res) => {
     const summary = chatResponse.choices[0].message.content;
 
     // Create a new summary type conversation
-    const conversation = queries.createConversation.get(
+    const conversation = await queries.createConversation(
       userId,
       `Summary: ${filename || "Document"}`,
       "summary"
     );
 
     // Save the summary as an assistant message
-    queries.createMessage.run(
-      conversation.id,
-      "assistant",
-      summary,
-      JSON.stringify(docs)
-    );
+    await queries.createMessage(conversation.id, "assistant", summary, docs);
 
     return res.json({
       summary,
@@ -240,7 +259,7 @@ app.post("/chat", async (req, res) => {
     // Save messages to database if conversationId is provided
     if (conversationId) {
       // If this is a "New Conversation", update the title using the first user question
-      const currentConversation = queries.getConversation.get(conversationId);
+      const currentConversation = await queries.getConversation(conversationId);
       if (
         currentConversation &&
         currentConversation.title === "New Conversation"
@@ -249,22 +268,22 @@ app.post("/chat", async (req, res) => {
           userQuery.length > 50
             ? userQuery.substring(0, 50) + "..."
             : userQuery;
-        queries.updateConversationTitle.run(newTitle, conversationId);
+        await queries.updateConversationTitle(newTitle, conversationId);
       }
 
       // Save user message
-      queries.createMessage.run(conversationId, "user", userQuery, null);
+      await queries.createMessage(conversationId, "user", userQuery, null);
 
       // Save assistant message with documents
-      queries.createMessage.run(
+      await queries.createMessage(
         conversationId,
         "assistant",
         assistantMessage,
-        JSON.stringify(result)
+        result
       );
 
       // Update conversation timestamp
-      queries.updateConversationTimestamp.run(conversationId);
+      await queries.updateConversationTimestamp(conversationId);
     }
 
     console.log("Chat:", assistantMessage);
