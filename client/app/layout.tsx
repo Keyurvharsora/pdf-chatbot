@@ -23,7 +23,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "PDF Chatbot",
-  description: "PDF Chatbot",
+  description: "Advanced AI-powered PDF conversation engine.",
 };
 
 export default function RootLayout({
