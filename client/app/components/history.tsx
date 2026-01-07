@@ -12,7 +12,7 @@ interface Conversation {
   id: number;
   user_id: string;
   title: string;
-  type: 'chat' | 'summary';
+  type: 'chat' | 'summary' | 'translation';
   created_at: string;
   updated_at: string;
 }
@@ -188,6 +188,8 @@ const HistoryComponent: React.FC = () => {
                             px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter
                             ${conv.type === 'summary' 
                                 ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
+                                : conv.type === 'translation'
+                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                                 : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                             }
                         `}>

@@ -1,7 +1,7 @@
 'use client';
 
 import FileUploadComponent from "../components/file-upload";
-import { MessageSquare, History, Sparkles, Layout as LayoutIcon } from "lucide-react";
+import { MessageSquare, History, Sparkles, Layout as LayoutIcon, Languages } from "lucide-react";
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -16,6 +16,7 @@ export default function DashboardLayout({
   const navItems = [
     { name: 'Chat', icon: MessageSquare, path: '/chat' },
     { name: 'Summarize', icon: Sparkles, path: '/summary' },
+    { name: 'Translator', icon: Languages, path: '/translator' },
     { name: 'History', icon: History, path: '/history' },
   ];
 

@@ -11,7 +11,7 @@ async function initDb() {
       id SERIAL PRIMARY KEY,
       user_id TEXT NOT NULL,
       title TEXT,
-      type TEXT NOT NULL CHECK(type IN ('chat', 'summary')) DEFAULT 'chat',
+      type TEXT NOT NULL CHECK(type IN ('chat', 'summary', 'translation')) DEFAULT 'chat',
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );

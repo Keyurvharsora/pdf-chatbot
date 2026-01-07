@@ -11,13 +11,13 @@ import { queries } from "./db.js";
 const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
 
 // Redis client initialization as requested
-const redisClient = createClient({
-  url: process.env.REDIS_URL,
-});
-redisClient.on("error", (err) => console.error("Redis Error", err));
-await redisClient.connect();
+// const redisClient = createClient({
+//   url: process.env.REDIS_URL,
+// });
+// redisClient.on("error", (err) => console.error("Redis Error", err));
+// await redisClient.connect();
 
-const connection = process.env.REDIS_URL || {
+const connection = {
   host: process.env.REDIS_HOST,
   port: process.env.REDIS_PORT,
 };
@@ -155,6 +155,7 @@ app.delete("/conversations/:conversationId", async (req, res) => {
     return res.status(500).json({ error: "Failed to delete conversation" });
   }
 });
+
 // Summarize endpoint
 app.post("/summarize", async (req, res) => {
   try {
@@ -220,6 +221,90 @@ app.post("/summarize", async (req, res) => {
   } catch (error) {
     console.error("Summary error:", error);
     return res.status(500).json({ error: "Failed to generate summary" });
+  }
+});
+
+// Translate endpoint
+app.post("/translate", async (req, res) => {
+  try {
+    const { userId, filename, targetLanguage } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    if (!targetLanguage) {
+      return res.status(400).json({ error: "Target language is required" });
+    }
+
+    const embeddings = new MistralAIEmbeddings({
+      model: "mistral-embed",
+      apiKey: process.env.MISTRAL_API_KEY,
+    });
+
+    const vectorStore = await QdrantVectorStore.fromExistingCollection(
+      embeddings,
+      {
+        url: process.env.QDRANT_URL,
+        collectionName: process.env.QDRANT_COLLECTION_NAME,
+      }
+    );
+
+    // Retrieve chunks for translation
+    const retriever = vectorStore.asRetriever({ k: 10 });
+    const docs = await retriever.invoke(
+      "Extract the main content of this document for translation."
+    );
+
+    const context = docs.map((d) => d.pageContent).join("\n\n");
+
+    const SYSTEM_PROMPT = `You are a professional translator. 
+    Translate the provided document content into ${targetLanguage}.
+    Maintain the technical accuracy and professional tone of the original text.
+    If the document has specific sections, try to preserve the structure in the translation.
+
+    IMPORTANT:
+    - Do NOT use Markdown formatting.
+    - Do NOT use **, __, *, #, or bullet styling.
+    - Return plain text only.
+    
+    Document Name: ${filename || "Uploaded PDF"}
+    Target Language: ${targetLanguage}
+    `;
+
+    const chatResponse = await client.chat.complete({
+      model: "mistral-large-latest",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `Context for translation:\n\n${context}` },
+      ],
+    });
+
+    const translatedText = chatResponse.choices[0].message.content;
+
+    // Create a new translation type conversation
+    const conversation = await queries.createConversation(
+      userId,
+      `Translation (${targetLanguage}): ${filename || "Document"}`,
+      "translation"
+    );
+
+    // Save the translation as an assistant message
+    await queries.createMessage(
+      conversation.id,
+      "assistant",
+      translatedText,
+      docs
+    );
+
+    return res.json({
+      translatedText,
+      conversationId: conversation.id,
+      docs,
+    });
+  } catch (error) {
+    console.error("Translation error:", error);
+    return res.status(500).json({ error: "Failed to translate document" });
   }
 });
 
