@@ -35,10 +35,19 @@ const SummaryComponent: React.FC = () => {
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(summary);
+  const handleCopy = async () => {
+      if (!navigator?.clipboard) {
+    console.error("Clipboard API not supported");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(summary);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  } catch (err) {
+    console.error("Failed to copy:", err);
+  }
   };
 
   const handleReset = () => {

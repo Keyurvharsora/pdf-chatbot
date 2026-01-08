@@ -55,7 +55,7 @@ export const worker = new Worker(
     }
   },
   {
-    connection: process.env.REDIS_URL || {
+    connection: {
       host: process.env.REDIS_HOST,
       port: process.env.REDIS_PORT,
     },
